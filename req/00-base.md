@@ -40,6 +40,9 @@ Compare current state to baseline, categorize as original/tracked/untracked.
 
 **00-R9:** When tracking data is corrupted, the system shall degrade gracefully.
 
+**00-R10:** When the system detects a session state the system should indicate
+that state visually within the current session.
+
 ---
 
 ### 02 - status current
