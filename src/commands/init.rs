@@ -10,7 +10,7 @@ pub fn run(out: &Output, force: bool, resume: bool) -> Result<(), String> {
     // 01-R9: --resume continues existing session
     if resume {
         if !exists {
-            return Err("No existing session to resume. Run 'envision init' first.".into());
+            return Err("No existing session to resume. Run 'envision session init' first.".into());
         }
         let session = storage::load_session(pid)?;
         out.success("Session resumed");

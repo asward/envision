@@ -42,10 +42,13 @@ impl Session {
 }
 
 fn generate_session_id(pid: u32, timestamp: u64) -> String {
-    // Simple hash: mix PID and timestamp bits, take 8 hex chars
-    let mut h: u64 = 0x517cc1b727220a95; // arbitrary seed
-    h = h.wrapping_mul(6364136223846793005).wrapping_add(pid as u64);
-    h = h.wrapping_mul(6364136223846793005).wrapping_add(timestamp);
+    // Mix PID and timestamp bits, take 8 hex chars
+    let mut h: u64 = 0x517cc1b727220a95;
+    h ^= pid as u64;
+    h = h.wrapping_mul(0x9e3779b97f4a7c15);
+    h ^= timestamp;
+    h = h.wrapping_mul(0x9e3779b97f4a7c15);
+    h ^= h >> 27;
     format!("{:08x}", (h >> 32) as u32)
 }
 

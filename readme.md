@@ -13,15 +13,12 @@ Working in the terminal, you constantly modify environment variables—setting p
 - **Tracking your changes** explicitly (set, unset operations)
 - **Detecting external changes** (things modified outside the tool)
 - **Maintaining a baseline** you can always return to
-- **Showing clear diffs** of your environment state
-
 Think of it as version control for your shell environment.
 
 ## Features
 
 - **Baseline snapshots** - Capture your environment's initial state
 - **Change tracking** - Know exactly what you modified
-- **Smart diffing** - See original vs. tracked vs. untracked changes
 - **Quick reset** - Return to baseline instantly
 - **Session-based** - Per-shell tracking, no global pollution
 - **Zero dependencies** - Single static binary
@@ -75,7 +72,7 @@ This allows `envision` to output shell commands that modify your environment whe
 Start tracking in your current shell session:
 
 ```bash
-envision init
+envision session init
 # Session initialized: abc123
 # Baseline captured: 47 variables
 ```
@@ -93,33 +90,12 @@ envision set DEBUG_MODE true
 ### Check Status
 
 ```bash
-envision status current
+envision status
 # Session: abc123
 # Baseline: 2024-02-05 14:23:15
 # Tracked changes: 2
 # Untracked changes: 0
 # State: clean
-```
-
-### View Differences
-
-```bash
-envision diff show
-# + PROJECT_ROOT=/home/user/myproject (tracked)
-# + DEBUG_MODE=true (tracked)
-# 47 unchanged variables
-```
-
-If you modify variables outside `envision`:
-
-```bash
-export MANUAL_VAR=foo
-
-envision diff show
-# + PROJECT_ROOT=/home/user/myproject (tracked)
-# + DEBUG_MODE=true (tracked)
-# + MANUAL_VAR=foo (untracked)
-# 47 unchanged variables
 ```
 
 ### Unset Variables
@@ -151,16 +127,15 @@ envision clear --force
 
 | Command                      | Description                                  |
 | ---------------------------- | -------------------------------------------- |
-| `envision init`              | Create baseline snapshot for current session |
-| `envision status current`    | Show current state and change summary        |
+| `envision session init`      | Create baseline snapshot for current session |
+| `envision status`            | Show current state and change summary        |
 | `envision set <VAR> <value>` | Set and track an environment variable        |
 | `envision unset <VAR>`       | Unset and track removal of a variable        |
 | `envision clear`             | Remove all tracked changes, restore baseline |
-| `envision diff show`         | Display changes from baseline                |
 
 ## How It Works
 
-1. **Initialization** - `envision init` captures your current environment as the baseline
+1. **Initialization** - `envision session init` captures your current environment as the baseline
 2. **Tracking** - Each `set`/`unset` operation is recorded in session metadata
 3. **Categorization** - Variables are classified as:
    - **Original**: Present in baseline, unchanged
@@ -181,7 +156,7 @@ Each shell session gets a unique identifier. Data persists across shell restarts
 cargo test
 
 # Run with debug output
-RUST_LOG=debug cargo run -- init
+RUST_LOG=debug cargo run -- session init
 
 # Check formatting
 cargo fmt --check

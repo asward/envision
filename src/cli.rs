@@ -41,42 +41,15 @@ impl Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Create baseline snapshot of current environment state
-    Init {
-        /// Reinitialize even if a session already exists (loses tracking history)
-        #[arg(long)]
-        force: bool,
-
-        /// Resume an existing session instead of creating a new one
-        #[arg(long, conflicts_with = "force")]
-        resume: bool,
+    /// Manage tracking sessions
+    Session {
+        #[command(subcommand)]
+        action: SessionAction,
     },
 
     /// Display session status
-    Status {
-        #[command(subcommand)]
-        action: StatusAction,
-    },
+    Status,
 
-    /// Set or unset environment variables
-    #[command(subcommand)]
-    Manipulate(ManipulateAction),
-
-    /// Show environment differences
-    Diff {
-        #[command(subcommand)]
-        action: DiffAction,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum StatusAction {
-    /// Show current state and change summary
-    Current,
-}
-
-#[derive(Subcommand)]
-pub enum ManipulateAction {
     /// Set and track an environment variable
     Set {
         /// Variable name
@@ -100,7 +73,15 @@ pub enum ManipulateAction {
 }
 
 #[derive(Subcommand)]
-pub enum DiffAction {
-    /// Display changes from baseline
-    Show,
+pub enum SessionAction {
+    /// Create baseline snapshot of current environment state
+    Init {
+        /// Reinitialize even if a session already exists (loses tracking history)
+        #[arg(long)]
+        force: bool,
+
+        /// Resume an existing session instead of creating a new one
+        #[arg(long, conflicts_with = "force")]
+        resume: bool,
+    },
 }

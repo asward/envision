@@ -4,7 +4,7 @@ mod output;
 mod session;
 mod storage;
 
-use cli::{Cli, Command};
+use cli::{Cli, Command, SessionAction};
 use output::Output;
 use std::process;
 
@@ -13,10 +13,13 @@ fn main() {
     let args = Cli::parse_filtered();
 
     let result = match args.command {
-        Command::Init { force, resume } => commands::init::run(&out, force, resume),
-        Command::Status { action: _ } => Err("'status' is not yet implemented".into()),
-        Command::Manipulate(_) => Err("'manipulate' is not yet implemented".into()),
-        Command::Diff { action: _ } => Err("'diff' is not yet implemented".into()),
+        Command::Session { action } => match action {
+            SessionAction::Init { force, resume } => commands::init::run(&out, force, resume),
+        },
+        Command::Status => Err("'status' is not yet implemented".into()),
+        Command::Set { .. } => Err("'set' is not yet implemented".into()),
+        Command::Unset { .. } => Err("'unset' is not yet implemented".into()),
+        Command::Clear { .. } => Err("'clear' is not yet implemented".into()),
     };
 
     match result {
