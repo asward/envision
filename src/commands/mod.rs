@@ -1,4 +1,5 @@
 pub mod hook;
+pub mod profile;
 pub mod session;
 pub mod set;
 pub mod status;

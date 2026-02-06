@@ -18,6 +18,7 @@ fn main() {
         Command::Session { action } => match action {
             SessionAction::Init { force, resume } => commands::session::init(&out, &mut ex, force, resume),
         },
+        Command::Profile { path, yes, dry_run } => commands::profile::run(&out, &mut ex, &path, yes, dry_run),
         Command::Hook { shell } => commands::hook::run(&shell),
         Command::Status => commands::status::run(&out),
         Command::Set { var, value } => commands::set::run(&out, &mut ex, &var, &value),

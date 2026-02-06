@@ -64,6 +64,20 @@ pub enum Command {
         var: String,
     },
 
+    /// Load environment variables from a profile script
+    Profile {
+        /// Path to the profile file (.profile.sh or .envision)
+        path: String,
+
+        /// Skip confirmation prompt
+        #[arg(long)]
+        yes: bool,
+
+        /// Show what would change without applying
+        #[arg(long)]
+        dry_run: bool,
+    },
+
     /// Print shell hook to stdout (add `eval "$(envision hook bash)"` to your RC file)
     Hook {
         /// Shell type

@@ -63,7 +63,7 @@ For fish shell, add to `~/.config/fish/config.fish`:
 envision hook fish | source
 ```
 
-This sets up a shell wrapper so that commands like `set`, `unset`, and `clear` can modify your current shell's environment.
+This sets up a shell wrapper so that commands like `set`, `unset`, `clear`, and `profile` can modify your current shell's environment.
 
 ## Usage
 
@@ -108,6 +108,34 @@ envision unset DEBUG_MODE
 # Unset DEBUG_MODE (was: true)
 ```
 
+### Load a Profile
+
+Apply environment variables from a profile script:
+
+```bash
+# Create a profile
+cat > dev.profile.sh <<'EOF'
+export DATABASE_URL="postgres://localhost/dev"
+export LOG_LEVEL="debug"
+export APP_ENV="development"
+EOF
+
+# Load it (prompts for confirmation on first use)
+envision profile dev.profile.sh
+# Loading profile: /home/user/project/dev.profile.sh
+# Continue? [y/N] y
+# Profile 'dev' loaded
+# Variables changed: 3
+
+# Preview without applying
+envision profile --dry-run dev.profile.sh
+
+# Skip confirmation
+envision profile --yes dev.profile.sh
+```
+
+Profile files must use `.profile.sh` or `.envision` extension. Changes are tracked in the active session if one exists.
+
 ### Reset to Baseline
 
 ```bash
@@ -135,6 +163,7 @@ envision clear --force
 | `envision status`            | Show current state and change summary        |
 | `envision set <VAR> <value>` | Set and track an environment variable        |
 | `envision unset <VAR>`       | Unset and track removal of a variable        |
+| `envision profile <file>`    | Load environment variables from a profile    |
 | `envision clear`             | Remove all tracked changes, restore baseline |
 
 ## How It Works
@@ -169,7 +198,7 @@ cargo clippy
 
 ## Roadmap
 
-- [ ] Profile/template system for reusable environment configurations
+- [x] Profile system for reusable environment configurations
 - [ ] Interactive TUI for visual state management
 - [ ] Snapshot comparison and history
 - [ ] Export/import environment configurations
