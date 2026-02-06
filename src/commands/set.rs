@@ -2,7 +2,7 @@ use crate::export::Exports;
 use crate::output::Output;
 use crate::session::{self, OverwriteKind, Session, TrackedChange};
 
-pub fn run(out: &Output, ex: &mut Exports, var: &str, value: &str) -> Result<(), String> {
+pub fn run(out: &Output, ex: &mut Exports, var: &str, value: &str) -> Result<u8, String> {
     // 03-R2, 03-R3: validate POSIX variable name
     session::validate_var_name(var)?;
 
@@ -23,7 +23,7 @@ pub fn run(out: &Output, ex: &mut Exports, var: &str, value: &str) -> Result<(),
         if let Some(TrackedChange::Set { value: tracked_val, .. }) = sess.tracked.get(var) {
             if tracked_val == value {
                 ex.save_session(&sess)?;
-                return Ok(());
+                return Ok(0);
             }
         }
 
@@ -41,5 +41,5 @@ pub fn run(out: &Output, ex: &mut Exports, var: &str, value: &str) -> Result<(),
         }
     }
 
-    Ok(())
+    Ok(0)
 }

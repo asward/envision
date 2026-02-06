@@ -14,21 +14,21 @@ fn main() {
     let mut ex = Exports::new();
     let args = Cli::parse_filtered();
 
-    let result = match args.command {
+    let result: Result<u8, String> = match args.command {
         Command::Session { action } => match action {
             SessionAction::Init { force, resume } => commands::session::init(&out, &mut ex, force, resume),
         },
         Command::Hook { shell } => commands::hook::run(&shell),
-        Command::Status => Err("'status' is not yet implemented".into()),
+        Command::Status => commands::status::run(&out),
         Command::Set { var, value } => commands::set::run(&out, &mut ex, &var, &value),
         Command::Unset { var } => commands::unset::run(&out, &mut ex, &var),
         Command::Clear { .. } => Err("'clear' is not yet implemented".into()),
     };
 
     match result {
-        Ok(()) => {
+        Ok(code) => {
             ex.flush();
-            process::exit(0);
+            process::exit(code as i32);
         }
         Err(msg) => {
             out.error(&format!("Error: {msg}"));

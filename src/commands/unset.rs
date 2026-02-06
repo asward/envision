@@ -2,14 +2,14 @@ use crate::export::Exports;
 use crate::output::Output;
 use crate::session::{self, PreviousKind, Session};
 
-pub fn run(out: &Output, ex: &mut Exports, var: &str) -> Result<(), String> {
+pub fn run(out: &Output, ex: &mut Exports, var: &str) -> Result<u8, String> {
     // 04-R2: validate variable name exists in environment
     let current_value = std::env::var(var).ok();
 
     // 04-R12: warn but succeed if variable doesn't exist
     if current_value.is_none() {
         out.warn(&format!("Variable '{var}' is not set"));
-        return Ok(());
+        return Ok(0);
     }
 
     // 04-R11: strong warning for system-critical variables
@@ -40,5 +40,5 @@ pub fn run(out: &Output, ex: &mut Exports, var: &str) -> Result<(), String> {
         }
     }
 
-    Ok(())
+    Ok(0)
 }

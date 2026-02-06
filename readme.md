@@ -92,11 +92,14 @@ envision set DEBUG_MODE true
 ```bash
 envision status
 # Session: abc123
-# Baseline: 2024-02-05 14:23:15
+# Baseline: 2024-02-05 14:23:15 UTC
 # Tracked changes: 2
 # Untracked changes: 0
+# Total changed: 2
 # State: clean
 ```
+
+Exit code is 0 when clean (no untracked changes), 1 when dirty.
 
 ### Unset Variables
 
@@ -146,9 +149,7 @@ envision clear --force
 
 ## Storage
 
-Session data is stored in `~/.local/share/envision/sessions/` (or `$XDG_DATA_HOME/envision/sessions/`).
-
-Each shell session gets a unique identifier. Data persists across shell restarts within the same session.
+Session data is stored entirely in the `ENVISION_SESSION` environment variable as base64-encoded JSON. No files are written to disk. The session persists naturally within your shell and is isolated per shell instance.
 
 ## Development
 

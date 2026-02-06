@@ -47,7 +47,7 @@ pub enum Command {
         action: SessionAction,
     },
 
-    /// Display session status
+    /// Display session status (exits 0 if clean, 1 if dirty)
     Status,
 
     /// Set and track an environment variable

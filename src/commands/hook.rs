@@ -1,12 +1,12 @@
 use crate::cli::Shell;
 
-pub fn run(shell: &Shell) -> Result<(), String> {
+pub fn run(shell: &Shell) -> Result<u8, String> {
     let code = match shell {
         Shell::Bash | Shell::Zsh => BASH_HOOK,
         Shell::Fish => FISH_HOOK,
     };
     print!("{code}");
-    Ok(())
+    Ok(0)
 }
 
 const BASH_HOOK: &str = r#"

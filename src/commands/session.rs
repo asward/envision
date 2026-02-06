@@ -3,7 +3,7 @@ use crate::output::Output;
 use crate::session::Session;
 use std::collections::BTreeMap;
 
-pub fn init(out: &Output, ex: &mut Exports, force: bool, resume: bool) -> Result<(), String> {
+pub fn init(out: &Output, ex: &mut Exports, force: bool, resume: bool) -> Result<u8, String> {
     let existing = Session::load()?;
 
     // 01-R9: --resume continues existing session
@@ -12,7 +12,7 @@ pub fn init(out: &Output, ex: &mut Exports, force: bool, resume: bool) -> Result
             Some(session) => {
                 out.success("Session resumed");
                 out.key_value("Session", &session.id);
-                return Ok(());
+                return Ok(0);
             }
             None => {
                 return Err("No existing session to resume. Run 'envision session init' first.".into());
@@ -47,5 +47,5 @@ pub fn init(out: &Output, ex: &mut Exports, force: bool, resume: bool) -> Result
     out.key_value("Session", &session.id);
     out.key_value("Variables captured", &var_count.to_string());
 
-    Ok(())
+    Ok(0)
 }
