@@ -69,6 +69,10 @@ pub enum Command {
         /// Path to the profile file (.profile.sh or .envision)
         path: String,
 
+        /// Initialize a session before loading the profile
+        #[arg(short, long)]
+        session: bool,
+
         /// Skip confirmation prompt
         #[arg(long)]
         yes: bool,
@@ -77,6 +81,9 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Print the current banner line (for testing/debugging)
+    Banner,
 
     /// Print shell hook to stdout (add `eval "$(envision hook bash)"` to your RC file)
     Hook {

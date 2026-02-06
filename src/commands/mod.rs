@@ -1,3 +1,4 @@
+pub mod banner;
 pub mod hook;
 pub mod profile;
 pub mod session;

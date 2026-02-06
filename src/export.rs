@@ -1,4 +1,9 @@
-use crate::session::Session;
+use crate::session::{self, Session};
+use std::collections::BTreeMap;
+
+pub const SESSION_ID_VAR: &str = "ENVISION_SESSION_ID";
+pub const TRACKED_COUNT_VAR: &str = "ENVISION_TRACKED";
+pub const DIRTY_VAR: &str = "ENVISION_DIRTY";
 
 /// Collects shell statements to be eval'd by the hook.
 /// All stdout output goes through here.
@@ -25,6 +30,28 @@ impl Exports {
     /// Queue the session env var export.
     pub fn save_session(&mut self, session: &Session) -> Result<(), String> {
         self.statements.push(session.export_statement()?);
+        Ok(())
+    }
+
+    /// Compute and queue banner state env vars (session ID, tracked count, dirty flag).
+    /// Called after mutating commands so the shell banner can display state without a subprocess.
+    pub fn update_banner_vars(&mut self) -> Result<(), String> {
+        match Session::load()? {
+            Some(session) => {
+                self.set_var(SESSION_ID_VAR, &session.id);
+                self.set_var(TRACKED_COUNT_VAR, &session.tracked.len().to_string());
+
+                let current_env: BTreeMap<String, String> = std::env::vars().collect();
+                let untracked = session::count_untracked(&session, &current_env);
+                let dirty = if untracked > 0 { "1" } else { "0" };
+                self.set_var(DIRTY_VAR, dirty);
+            }
+            None => {
+                self.unset_var(SESSION_ID_VAR);
+                self.unset_var(TRACKED_COUNT_VAR);
+                self.unset_var(DIRTY_VAR);
+            }
+        }
         Ok(())
     }
 

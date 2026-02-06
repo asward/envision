@@ -1,4 +1,4 @@
-use crate::export::Exports;
+use crate::export::{self, Exports};
 use crate::output::Output;
 use crate::session::{hash_value, Session, SESSION_VAR};
 use std::collections::BTreeMap;
@@ -12,7 +12,7 @@ const CHECKSUM_VAR: &str = "ENVISION_PROFILE_CHECKSUM";
 const SUBSHELL_NOISE: &[&str] = &["_", "SHLVL", "BASH_EXECUTION_STRING"];
 
 /// 08-R2 through 08-R33
-pub fn run(out: &Output, ex: &mut Exports, path: &str, yes: bool, dry_run: bool) -> Result<u8, String> {
+pub fn run(out: &Output, ex: &mut Exports, path: &str, session: bool, yes: bool, dry_run: bool) -> Result<u8, String> {
     // 08-R31, 08-R32: resolve path
     let path = resolve_path(path);
 
@@ -27,6 +27,11 @@ pub fn run(out: &Output, ex: &mut Exports, path: &str, yes: bool, dry_run: bool)
     // 08-R6, 08-R7: confirmation prompt on first load (no checksum stored)
     if !yes && std::env::var(CHECKSUM_VAR).is_err() {
         prompt_confirmation(out, &path)?;
+    }
+
+    // --session / -s: initialize a session before loading the profile
+    if session {
+        init_session(out, ex)?;
     }
 
     // Capture current env
@@ -88,6 +93,25 @@ pub fn run(out: &Output, ex: &mut Exports, path: &str, yes: bool, dry_run: bool)
     out.key_value("Variables changed", &changes.len().to_string());
 
     Ok(0)
+}
+
+/// Initialize or resume a session before loading a profile.
+fn init_session(out: &Output, ex: &mut Exports) -> Result<(), String> {
+    match Session::load()? {
+        Some(session) => {
+            out.info(&format!("Session {} already active", session.id));
+        }
+        None => {
+            let env: BTreeMap<String, String> = std::env::vars().collect();
+            let var_count = env.len();
+            let session = Session::new(&env);
+            ex.save_session(&session)?;
+            out.success("Session initialized");
+            out.key_value("Session", &session.id);
+            out.key_value("Variables captured", &var_count.to_string());
+        }
+    }
+    Ok(())
 }
 
 enum EnvChange {
@@ -223,6 +247,9 @@ fn should_skip(var: &str) -> bool {
         || var == SESSION_VAR
         || var == PROFILE_VAR
         || var == CHECKSUM_VAR
+        || var == export::SESSION_ID_VAR
+        || var == export::TRACKED_COUNT_VAR
+        || var == export::DIRTY_VAR
 }
 
 /// 08-R11: derive profile name from filename (strip extension).

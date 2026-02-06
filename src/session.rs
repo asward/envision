@@ -179,6 +179,58 @@ pub enum PreviousKind {
     Untracked,
 }
 
+/// Env vars managed by envision that should be excluded from untracked change detection.
+const ENVISION_VARS: &[&str] = &[
+    SESSION_VAR,
+    "ENVISION_PROFILE",
+    "ENVISION_PROFILE_CHECKSUM",
+    "ENVISION_SESSION_ID",
+    "ENVISION_TRACKED",
+    "ENVISION_DIRTY",
+];
+
+/// Count environment changes not tracked by the session.
+/// An untracked change is a baseline variable whose current hash differs
+/// from the stored hash, AND which is not in the tracked set.
+/// Also counts baseline variables that have disappeared and new variables
+/// that weren't in the baseline (excluding envision-managed vars and tracked vars).
+pub fn count_untracked(session: &Session, current_env: &BTreeMap<String, String>) -> usize {
+    let mut count = 0;
+
+    // Check baseline vars for hash changes or disappearance
+    for (var, &baseline_hash) in &session.baseline {
+        if session.tracked.contains_key(var) {
+            continue;
+        }
+        match current_env.get(var) {
+            Some(current_val) => {
+                if hash_value(current_val) != baseline_hash {
+                    count += 1;
+                }
+            }
+            None => {
+                count += 1;
+            }
+        }
+    }
+
+    // Check for new variables not in baseline and not tracked
+    for var in current_env.keys() {
+        if ENVISION_VARS.iter().any(|&v| v == var) {
+            continue;
+        }
+        if session.baseline.contains_key(var) {
+            continue;
+        }
+        if session.tracked.contains_key(var) {
+            continue;
+        }
+        count += 1;
+    }
+
+    count
+}
+
 /// FNV-1a hash for value fingerprinting.
 pub fn hash_value(s: &str) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
@@ -363,5 +415,118 @@ mod tests {
         let result = session.track_unset("FOO");
         assert!(result.previous.is_none());
         assert!(!session.tracked.contains_key("FOO"));
+    }
+
+    #[test]
+    fn count_untracked_clean_when_matching() {
+        let mut baseline = BTreeMap::new();
+        baseline.insert("FOO".into(), hash_value("bar"));
+        baseline.insert("BAZ".into(), hash_value("qux"));
+
+        let session = Session {
+            id: "test".into(),
+            created_at: 0,
+            baseline,
+            tracked: BTreeMap::new(),
+        };
+
+        let mut env = BTreeMap::new();
+        env.insert("FOO".into(), "bar".into());
+        env.insert("BAZ".into(), "qux".into());
+
+        assert_eq!(count_untracked(&session, &env), 0);
+    }
+
+    #[test]
+    fn count_untracked_detects_changed_value() {
+        let mut baseline = BTreeMap::new();
+        baseline.insert("FOO".into(), hash_value("bar"));
+
+        let session = Session {
+            id: "test".into(),
+            created_at: 0,
+            baseline,
+            tracked: BTreeMap::new(),
+        };
+
+        let mut env = BTreeMap::new();
+        env.insert("FOO".into(), "changed".into());
+
+        assert_eq!(count_untracked(&session, &env), 1);
+    }
+
+    #[test]
+    fn count_untracked_detects_removed_var() {
+        let mut baseline = BTreeMap::new();
+        baseline.insert("FOO".into(), hash_value("bar"));
+
+        let session = Session {
+            id: "test".into(),
+            created_at: 0,
+            baseline,
+            tracked: BTreeMap::new(),
+        };
+
+        let env = BTreeMap::new();
+
+        assert_eq!(count_untracked(&session, &env), 1);
+    }
+
+    #[test]
+    fn count_untracked_detects_new_var() {
+        let session = Session {
+            id: "test".into(),
+            created_at: 0,
+            baseline: BTreeMap::new(),
+            tracked: BTreeMap::new(),
+        };
+
+        let mut env = BTreeMap::new();
+        env.insert("NEW_VAR".into(), "hello".into());
+
+        assert_eq!(count_untracked(&session, &env), 1);
+    }
+
+    #[test]
+    fn count_untracked_ignores_envision_vars() {
+        let session = Session {
+            id: "test".into(),
+            created_at: 0,
+            baseline: BTreeMap::new(),
+            tracked: BTreeMap::new(),
+        };
+
+        let mut env = BTreeMap::new();
+        env.insert(SESSION_VAR.into(), "data".into());
+        env.insert("ENVISION_PROFILE".into(), "dev".into());
+        env.insert("ENVISION_DIRTY".into(), "0".into());
+        env.insert("ENVISION_SESSION_ID".into(), "abc".into());
+        env.insert("ENVISION_TRACKED".into(), "0".into());
+
+        assert_eq!(count_untracked(&session, &env), 0);
+    }
+
+    #[test]
+    fn count_untracked_skips_tracked_vars() {
+        let mut baseline = BTreeMap::new();
+        baseline.insert("FOO".into(), hash_value("bar"));
+
+        let mut tracked = BTreeMap::new();
+        tracked.insert("FOO".into(), TrackedChange::Set {
+            value: "changed".into(),
+            previous: Some("bar".into()),
+        });
+
+        let session = Session {
+            id: "test".into(),
+            created_at: 0,
+            baseline,
+            tracked,
+        };
+
+        let mut env = BTreeMap::new();
+        env.insert("FOO".into(), "changed".into());
+
+        assert_eq!(count_untracked(&session, &env), 0);
     }
 }

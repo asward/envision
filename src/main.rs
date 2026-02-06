@@ -14,20 +14,30 @@ fn main() {
     let mut ex = Exports::new();
     let args = Cli::parse_filtered();
 
+    // Track whether this command mutates env (needs banner var update)
+    let mut mutating = true;
+
     let result: Result<u8, String> = match args.command {
         Command::Session { action } => match action {
             SessionAction::Init { force, resume } => commands::session::init(&out, &mut ex, force, resume),
         },
-        Command::Profile { path, yes, dry_run } => commands::profile::run(&out, &mut ex, &path, yes, dry_run),
-        Command::Hook { shell } => commands::hook::run(&shell),
-        Command::Status => commands::status::run(&out),
+        Command::Profile { path, session, yes, dry_run } => commands::profile::run(&out, &mut ex, &path, session, yes, dry_run),
         Command::Set { var, value } => commands::set::run(&out, &mut ex, &var, &value),
         Command::Unset { var } => commands::unset::run(&out, &mut ex, &var),
         Command::Clear { .. } => Err("'clear' is not yet implemented".into()),
+        // Non-mutating commands
+        Command::Hook { shell } => { mutating = false; commands::hook::run(&shell) },
+        Command::Status => { mutating = false; commands::status::run(&out) },
+        Command::Banner => { mutating = false; commands::banner::run() },
     };
 
     match result {
         Ok(code) => {
+            if mutating {
+                if let Err(e) = ex.update_banner_vars() {
+                    out.warn(&format!("Could not update banner state: {e}"));
+                }
+            }
             ex.flush();
             process::exit(code as i32);
         }
