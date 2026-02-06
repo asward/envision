@@ -12,7 +12,7 @@ pub fn run(shell: &Shell) -> Result<(), String> {
 const BASH_HOOK: &str = r#"
 envision() {
     case "$1" in
-        set|unset|clear)
+        session|set|unset|clear)
             local _envision_out
             _envision_out="$(command envision "$@")"
             local _envision_rc=$?
@@ -31,7 +31,7 @@ envision() {
 const FISH_HOOK: &str = r#"
 function envision
     switch $argv[1]
-        case set unset clear
+        case session set unset clear
             set -l _envision_out (command envision $argv)
             set -l _envision_rc $status
             if test $_envision_rc -eq 0; and test -n "$_envision_out"

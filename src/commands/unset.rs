@@ -1,8 +1,8 @@
+use crate::export::Exports;
 use crate::output::Output;
-use crate::session::{self, PreviousKind};
-use crate::storage;
+use crate::session::{self, PreviousKind, Session};
 
-pub fn run(out: &Output, var: &str) -> Result<(), String> {
+pub fn run(out: &Output, ex: &mut Exports, var: &str) -> Result<(), String> {
     // 04-R2: validate variable name exists in environment
     let current_value = std::env::var(var).ok();
 
@@ -17,20 +17,17 @@ pub fn run(out: &Output, var: &str) -> Result<(), String> {
         out.warn(&format!("Warning: '{var}' is a system-critical variable"));
     }
 
-    // 04-R3: output shell unset command to stdout
-    println!("unset {var}");
+    // 04-R3: unset the variable
+    ex.unset_var(var);
 
     // 04-R8, 04-R9: confirm and display removed value
     let prev = current_value.unwrap();
     out.success(&format!("Unset {var} (was: {prev})"));
 
     // 04-R4, 04-R5, 04-R6: track if session exists
-    let pid = session::parent_pid();
-    if storage::session_exists(pid)? {
-        let mut sess = storage::load_session(pid)?;
-
+    if let Some(mut sess) = Session::load()? {
         let result = sess.track_unset(var);
-        storage::save_session(&sess)?;
+        ex.save_session(&sess)?;
 
         // 04-R10: indicate whether it was tracked, untracked, or original
         if result.previous.is_some() {

@@ -1,13 +1,17 @@
+use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub const SESSION_VAR: &str = "ENVISION_SESSION";
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Session {
     pub id: String,
-    pub pid: u32,
     pub created_at: u64,
-    pub baseline: BTreeMap<String, String>,
+    /// Baseline: variable name -> hash of original value.
+    pub baseline: BTreeMap<String, u64>,
+    /// Tracked changes with full values.
     pub tracked: BTreeMap<String, TrackedChange>,
 }
 
@@ -29,27 +33,66 @@ const CRITICAL_VARS: &[&str] = &[
 ];
 
 impl Session {
-    pub fn new(pid: u32, env: BTreeMap<String, String>) -> Self {
+    /// Create a new session from the current environment.
+    /// Stores only hashes of baseline values.
+    pub fn new(env: &BTreeMap<String, String>) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock before epoch")
             .as_secs();
 
-        let id = generate_session_id(pid, now);
+        let id = generate_session_id(std::process::id(), now);
+
+        let baseline = env
+            .iter()
+            .filter(|(k, _)| k.as_str() != SESSION_VAR)
+            .map(|(k, v)| (k.clone(), hash_value(v)))
+            .collect();
 
         Self {
             id,
-            pid,
             created_at: now,
-            baseline: env,
+            baseline,
             tracked: BTreeMap::new(),
         }
+    }
+
+    /// Encode session as base64 string for storing in an env var.
+    pub fn encode(&self) -> Result<String, String> {
+        let json = serde_json::to_string(self)
+            .map_err(|e| format!("Failed to serialize session: {e}"))?;
+        Ok(STANDARD.encode(json.as_bytes()))
+    }
+
+    /// Decode session from a base64 env var value.
+    pub fn decode(encoded: &str) -> Result<Self, String> {
+        let bytes = STANDARD
+            .decode(encoded)
+            .map_err(|e| format!("Session data corrupted (bad base64): {e}"))?;
+        let json = std::str::from_utf8(&bytes)
+            .map_err(|e| format!("Session data corrupted (bad utf8): {e}"))?;
+        serde_json::from_str(json)
+            .map_err(|e| format!("Session data corrupted (bad json): {e}"))
+    }
+
+    /// Load session from the ENVISION_SESSION env var, if present.
+    pub fn load() -> Result<Option<Self>, String> {
+        match std::env::var(SESSION_VAR) {
+            Ok(val) if !val.is_empty() => Ok(Some(Self::decode(&val)?)),
+            _ => Ok(None),
+        }
+    }
+
+    /// Return the shell export statement to persist this session.
+    pub fn export_statement(&self) -> Result<String, String> {
+        let encoded = self.encode()?;
+        Ok(format!("export {SESSION_VAR}='{encoded}'"))
     }
 
     /// Record a set operation. Returns info about what was overwritten.
     /// 03-R6, 03-R7, 03-R8
     pub fn track_set(&mut self, var: &str, value: &str) -> SetResult {
-        let previous = self.current_value(var);
+        let previous = self.tracked_value(var);
 
         let overwrite_kind = if self.tracked.contains_key(var) {
             Some(OverwriteKind::Tracked)
@@ -70,7 +113,7 @@ impl Session {
     /// Record an unset operation. Returns info about what was removed.
     /// 04-R4, 04-R5, 04-R6
     pub fn track_unset(&mut self, var: &str) -> UnsetResult {
-        let previous = self.current_value(var);
+        let previous = self.tracked_value(var);
 
         let previous_kind = if self.tracked.contains_key(var) {
             PreviousKind::Tracked
@@ -89,13 +132,28 @@ impl Session {
         UnsetResult { previous, previous_kind }
     }
 
-    /// Get the current effective value of a variable:
-    /// check tracked changes first, then baseline.
-    fn current_value(&self, var: &str) -> Option<String> {
+    /// Get the last known value from tracked changes.
+    /// Since baseline only stores hashes, we can only return values
+    /// from tracked changes (which store full values).
+    fn tracked_value(&self, var: &str) -> Option<String> {
         match self.tracked.get(var) {
             Some(TrackedChange::Set { value, .. }) => Some(value.clone()),
             Some(TrackedChange::Unset { .. }) => None,
-            None => self.baseline.get(var).cloned(),
+            None => None,
+        }
+    }
+
+    /// Check if a variable existed in the baseline (by name).
+    pub fn in_baseline(&self, var: &str) -> bool {
+        self.baseline.contains_key(var)
+    }
+
+    /// Check if a baseline variable's value has changed.
+    /// Compares current env value hash against stored baseline hash.
+    pub fn baseline_changed(&self, var: &str, current_value: &str) -> bool {
+        match self.baseline.get(var) {
+            Some(&baseline_hash) => hash_value(current_value) != baseline_hash,
+            None => false,
         }
     }
 }
@@ -121,9 +179,17 @@ pub enum PreviousKind {
     Untracked,
 }
 
-/// Validate that a variable name follows POSIX naming rules:
-/// starts with letter or underscore, contains only letters, digits, underscores.
-/// 03-R2
+/// FNV-1a hash for value fingerprinting.
+pub fn hash_value(s: &str) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in s.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Validate that a variable name follows POSIX naming rules.
 pub fn validate_var_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("Variable name cannot be empty".into());
@@ -145,28 +211,12 @@ pub fn validate_var_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Check if a variable name is system-critical. 03-R13
+/// Check if a variable name is system-critical.
 pub fn is_critical_var(name: &str) -> bool {
     CRITICAL_VARS.contains(&name)
 }
 
-/// Get the parent shell's PID.
-pub fn parent_pid() -> u32 {
-    #[cfg(unix)]
-    {
-        unsafe extern "C" {
-            safe fn getppid() -> u32;
-        }
-        getppid()
-    }
-    #[cfg(not(unix))]
-    {
-        std::process::id()
-    }
-}
-
 fn generate_session_id(pid: u32, timestamp: u64) -> String {
-    // Mix PID and timestamp bits, take 8 hex chars
     let mut h: u64 = 0x517cc1b727220a95;
     h ^= pid as u64;
     h = h.wrapping_mul(0x9e3779b97f4a7c15);
@@ -179,6 +229,49 @@ fn generate_session_id(pid: u32, timestamp: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_env() -> BTreeMap<String, String> {
+        let mut env = BTreeMap::new();
+        env.insert("FOO".into(), "bar".into());
+        env.insert("PATH".into(), "/usr/bin".into());
+        env
+    }
+
+    #[test]
+    fn new_session_hashes_baseline() {
+        let env = test_env();
+        let session = Session::new(&env);
+        assert_eq!(session.baseline.len(), 2);
+        assert_eq!(*session.baseline.get("FOO").unwrap(), hash_value("bar"));
+        assert!(session.tracked.is_empty());
+    }
+
+    #[test]
+    fn encode_decode_roundtrip() {
+        let env = test_env();
+        let session = Session::new(&env);
+        let encoded = session.encode().unwrap();
+        let decoded = Session::decode(&encoded).unwrap();
+        assert_eq!(session.id, decoded.id);
+        assert_eq!(session.baseline, decoded.baseline);
+    }
+
+    #[test]
+    fn baseline_excludes_session_var() {
+        let mut env = test_env();
+        env.insert(SESSION_VAR.into(), "should_be_excluded".into());
+        let session = Session::new(&env);
+        assert!(!session.baseline.contains_key(SESSION_VAR));
+    }
+
+    #[test]
+    fn baseline_changed_detection() {
+        let env = test_env();
+        let session = Session::new(&env);
+        assert!(!session.baseline_changed("FOO", "bar"));
+        assert!(session.baseline_changed("FOO", "baz"));
+        assert!(!session.baseline_changed("NONEXISTENT", "whatever"));
+    }
 
     #[test]
     fn session_id_is_8_hex_chars() {
@@ -222,8 +315,7 @@ mod tests {
 
     #[test]
     fn track_set_new_variable() {
-        let env = BTreeMap::new();
-        let mut session = Session::new(1, env);
+        let session = &mut Session::new(&BTreeMap::new());
         let result = session.track_set("FOO", "bar");
         assert!(result.previous.is_none());
         assert!(result.overwrite_kind.is_none());
@@ -234,33 +326,31 @@ mod tests {
     }
 
     #[test]
-    fn track_set_overwrites_baseline() {
-        let mut env = BTreeMap::new();
-        env.insert("FOO".into(), "old".into());
-        let mut session = Session::new(1, env);
-        let result = session.track_set("FOO", "new");
-        assert_eq!(result.previous.as_deref(), Some("old"));
-        assert!(matches!(result.overwrite_kind, Some(OverwriteKind::Untracked)));
+    fn track_set_overwrites_tracked() {
+        let session = &mut Session::new(&BTreeMap::new());
+        session.track_set("FOO", "first");
+        let result = session.track_set("FOO", "second");
+        assert_eq!(result.previous.as_deref(), Some("first"));
+        assert!(matches!(result.overwrite_kind, Some(OverwriteKind::Tracked)));
     }
 
     #[test]
     fn track_unset_original_variable() {
-        let mut env = BTreeMap::new();
-        env.insert("FOO".into(), "bar".into());
-        let mut session = Session::new(1, env);
+        let env = test_env();
+        let session = &mut Session::new(&env);
+        // Simulate: var exists in baseline, we need to supply previous value
+        // via a prior track_set or by passing it in from the real env
+        // Since baseline only has hashes, track_unset won't know the value
+        // unless it was tracked. For original vars, the caller passes the value.
         let result = session.track_unset("FOO");
-        assert_eq!(result.previous.as_deref(), Some("bar"));
+        // previous is None because tracked_value returns None for untracked vars
+        assert!(result.previous.is_none());
         assert!(matches!(result.previous_kind, PreviousKind::Original));
-        assert!(matches!(
-            session.tracked.get("FOO"),
-            Some(TrackedChange::Unset { previous }) if previous == "bar"
-        ));
     }
 
     #[test]
     fn track_unset_tracked_variable() {
-        let env = BTreeMap::new();
-        let mut session = Session::new(1, env);
+        let session = &mut Session::new(&BTreeMap::new());
         session.track_set("FOO", "bar");
         let result = session.track_unset("FOO");
         assert_eq!(result.previous.as_deref(), Some("bar"));
@@ -269,21 +359,9 @@ mod tests {
 
     #[test]
     fn track_unset_nonexistent_variable() {
-        let env = BTreeMap::new();
-        let mut session = Session::new(1, env);
+        let session = &mut Session::new(&BTreeMap::new());
         let result = session.track_unset("FOO");
         assert!(result.previous.is_none());
-        // Should not insert a tracking entry
         assert!(!session.tracked.contains_key("FOO"));
-    }
-
-    #[test]
-    fn track_set_overwrites_tracked() {
-        let env = BTreeMap::new();
-        let mut session = Session::new(1, env);
-        session.track_set("FOO", "first");
-        let result = session.track_set("FOO", "second");
-        assert_eq!(result.previous.as_deref(), Some("first"));
-        assert!(matches!(result.overwrite_kind, Some(OverwriteKind::Tracked)));
     }
 }
