@@ -21,7 +21,7 @@ fn main() {
         Command::Session { action } => match action {
             SessionAction::Init { force, resume } => commands::session::init(&out, &mut ex, force, resume),
         },
-        Command::Profile { path, session, yes, dry_run } => commands::profile::run(&out, &mut ex, &path, session, yes, dry_run),
+        Command::Profile { path, yes, dry_run } => commands::profile::run(&out, &mut ex, &path, yes, dry_run),
         Command::Set { var, value } => commands::set::run(&out, &mut ex, &var, &value),
         Command::Unset { var } => commands::unset::run(&out, &mut ex, &var),
         Command::Clear { .. } => Err("'clear' is not yet implemented".into()),

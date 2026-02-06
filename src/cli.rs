@@ -69,10 +69,6 @@ pub enum Command {
         /// Path to the profile file (.profile.sh or .envision)
         path: String,
 
-        /// Initialize a session before loading the profile
-        #[arg(short, long)]
-        session: bool,
-
         /// Skip confirmation prompt
         #[arg(long)]
         yes: bool,

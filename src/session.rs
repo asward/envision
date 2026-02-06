@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const SESSION_VAR: &str = "ENVISION_SESSION";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     pub id: String,
     pub created_at: u64,
@@ -15,7 +15,7 @@ pub struct Session {
     pub tracked: BTreeMap<String, TrackedChange>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TrackedChange {
     Set {
         value: String,

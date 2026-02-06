@@ -5,6 +5,8 @@
 
 ## Requirements
 
+08-R1: When a profile is loaded, the system shall start a new session prior to loading, if a session does not already exists.
+
 08-R2: When profile is invoked with a file path, the system shall verify the file exists.
 
 08-R3: When the profile file does not exist, the system shall return an error with the file path.
@@ -24,7 +26,7 @@ environment variable as the profile name for the active session.
 
 08-R19: When a profile script execution fails, the system shall return the script's error message and exit code.
 
-08-R20: When a profile loads successfully, if there is an active session, the system shall mark the session with the active profile name.
+08-R20: When a profile loads successfully the system shall mark the session with the active profile name.
 
 08-R21: When a profile loads successfully, the system shall display a confirmation with the profile name and count of variables changed.
 

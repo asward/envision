@@ -9,26 +9,24 @@ pub fn run(out: &Output) -> Result<u8, String> {
     let session = Session::load()?
         .ok_or("No active session. Run 'envision session init' first.")?;
 
-    // 02-R3: display baseline timestamp
-    let timestamp = format_timestamp(session.created_at);
     out.key_value("Session", &session.id);
-    out.key_value("Baseline", &timestamp);
+
+    // Show profile name if one is loaded
+    if let Ok(profile) = std::env::var("ENVISION_PROFILE") {
+        if !profile.is_empty() {
+            out.key_value("Profile", &profile);
+        }
+    }
 
     // 02-R4: count tracked variables
-    let tracked_count = session.tracked.len();
-    out.key_value("Tracked changes", &tracked_count.to_string());
+    out.key_value("Tracked", &session.tracked.len().to_string());
 
-    // 02-R5: count untracked changes
+    // 02-R3: display baseline timestamp
+    out.key_value("Baseline", &format_timestamp(session.created_at));
+
+    // 02-R5, 02-R7, 02-R8: dirty/clean state (based on untracked changes)
     let current_env: BTreeMap<String, String> = std::env::vars().collect();
-    let untracked_count = session::count_untracked(&session, &current_env);
-    out.key_value("Untracked changes", &untracked_count.to_string());
-
-    // 02-R6: total count differing from baseline
-    let total_changed = tracked_count + untracked_count;
-    out.key_value("Total changed", &total_changed.to_string());
-
-    // 02-R7, 02-R8: dirty/clean state
-    let dirty = untracked_count > 0;
+    let dirty = session::count_untracked(&session, &current_env) > 0;
     if dirty {
         out.warn("State: dirty");
     } else {

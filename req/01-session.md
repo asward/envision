@@ -27,3 +27,11 @@ Initialize environment tracking for the current shell session by creating a base
 **01-R11:** When the storage location is unavailable, the system shall fail with a clear error message.
 
 **01-R12:** When session init detects stale session data from a crashed session, the system shall offer cleanup options.
+
+**01-R13:** When a session is activated the system shall display a banner
+message within the terminal on the top viewable line with simplified session
+status and profile name (if available).
+
+**01-R14:** When a session is active the banner must be updated after every envision operation to reflect the current session status and profile name (if available).
+
+**01-R15:** When a profile is loaded into a session the variables added should be tracked.

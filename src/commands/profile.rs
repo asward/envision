@@ -1,6 +1,6 @@
 use crate::export::{self, Exports};
 use crate::output::Output;
-use crate::session::{hash_value, Session, SESSION_VAR};
+use crate::session::{hash_value, SESSION_VAR};
 use std::collections::BTreeMap;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
@@ -12,7 +12,7 @@ const CHECKSUM_VAR: &str = "ENVISION_PROFILE_CHECKSUM";
 const SUBSHELL_NOISE: &[&str] = &["_", "SHLVL", "BASH_EXECUTION_STRING"];
 
 /// 08-R2 through 08-R33
-pub fn run(out: &Output, ex: &mut Exports, path: &str, session: bool, yes: bool, dry_run: bool) -> Result<u8, String> {
+pub fn run(out: &Output, ex: &mut Exports, path: &str, yes: bool, dry_run: bool) -> Result<u8, String> {
     // 08-R31, 08-R32: resolve path
     let path = resolve_path(path);
 
@@ -29,10 +29,8 @@ pub fn run(out: &Output, ex: &mut Exports, path: &str, session: bool, yes: bool,
         prompt_confirmation(out, &path)?;
     }
 
-    // --session / -s: initialize a session before loading the profile
-    if session {
-        init_session(out, ex)?;
-    }
+    // 08-R1: ensure a session exists before loading
+    let mut sess = crate::commands::session::ensure_session(out, ex)?;
 
     // Capture current env
     let before: BTreeMap<String, String> = std::env::vars().collect();
@@ -77,41 +75,20 @@ pub fn run(out: &Output, ex: &mut Exports, path: &str, session: bool, yes: bool,
     let checksum = hash_value(&contents);
     ex.set_var(CHECKSUM_VAR, &checksum.to_string());
 
-    // 08-R20: if session exists, track all changes
-    if let Some(mut sess) = Session::load()? {
-        for change in &changes {
-            match change {
-                EnvChange::Set(var, value) => { sess.track_set(var, value); }
-                EnvChange::Unset(var) => { sess.track_unset(var); }
-            }
+    // 08-R20: track all changes in the active session
+    for change in &changes {
+        match change {
+            EnvChange::Set(var, value) => { sess.track_set(var, value); }
+            EnvChange::Unset(var) => { sess.track_unset(var); }
         }
-        ex.save_session(&sess)?;
     }
+    ex.save_session(&sess)?;
 
     // 08-R21: display confirmation
     out.success(&format!("Profile '{profile_name}' loaded"));
     out.key_value("Variables changed", &changes.len().to_string());
 
     Ok(0)
-}
-
-/// Initialize or resume a session before loading a profile.
-fn init_session(out: &Output, ex: &mut Exports) -> Result<(), String> {
-    match Session::load()? {
-        Some(session) => {
-            out.info(&format!("Session {} already active", session.id));
-        }
-        None => {
-            let env: BTreeMap<String, String> = std::env::vars().collect();
-            let var_count = env.len();
-            let session = Session::new(&env);
-            ex.save_session(&session)?;
-            out.success("Session initialized");
-            out.key_value("Session", &session.id);
-            out.key_value("Variables captured", &var_count.to_string());
-        }
-    }
-    Ok(())
 }
 
 enum EnvChange {

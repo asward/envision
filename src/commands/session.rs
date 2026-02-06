@@ -34,7 +34,6 @@ pub fn init(out: &Output, ex: &mut Exports, force: bool, resume: bool) -> Result
 
     // 01-R1: capture all current environment variables as baseline (hashed)
     let env: BTreeMap<String, String> = std::env::vars().collect();
-    let var_count = env.len();
 
     // 01-R3: generate unique session identifier
     // 01-R5: initialize empty tracking state
@@ -43,9 +42,26 @@ pub fn init(out: &Output, ex: &mut Exports, force: bool, resume: bool) -> Result
     ex.save_session(&session)?;
 
     // 01-R10: display results (to stderr)
+    // 01-R13: banner is activated via update_banner_vars() in main.rs
     out.success("Session initialized");
     out.key_value("Session", &session.id);
-    out.key_value("Variables captured", &var_count.to_string());
 
     Ok(0)
+}
+
+/// Ensure a session exists, creating one if needed. Returns the active session.
+/// Used by profile (08-R1) and any command that requires an active session.
+pub fn ensure_session(out: &Output, ex: &mut Exports) -> Result<Session, String> {
+    if let Some(session) = Session::load()? {
+        return Ok(session);
+    }
+
+    let env: BTreeMap<String, String> = std::env::vars().collect();
+    let session = Session::new(&env);
+    ex.save_session(&session)?;
+
+    out.success("Session initialized");
+    out.key_value("Session", &session.id);
+
+    Ok(session)
 }
