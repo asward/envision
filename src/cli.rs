@@ -1,4 +1,4 @@
-use clap::{ColorChoice, CommandFactory, Parser, Subcommand};
+use clap::{ColorChoice, CommandFactory, Parser, Subcommand, ValueEnum};
 
 /// Detect --no-color from raw args (before clap parses).
 /// Returns true if --no-color flag is present or NO_COLOR env var is set.
@@ -64,12 +64,25 @@ pub enum Command {
         var: String,
     },
 
+    /// Print shell hook to stdout (add `eval "$(envision hook bash)"` to your RC file)
+    Hook {
+        /// Shell type
+        shell: Shell,
+    },
+
     /// Remove all tracked changes, restore to baseline
     Clear {
         /// Skip confirmation prompt
         #[arg(long)]
         force: bool,
     },
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum Shell {
+    Bash,
+    Zsh,
+    Fish,
 }
 
 #[derive(Subcommand)]

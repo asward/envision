@@ -1,10 +1,10 @@
 use crate::output::Output;
-use crate::session::Session;
+use crate::session::{self, Session};
 use crate::storage;
 use std::collections::BTreeMap;
 
-pub fn run(out: &Output, force: bool, resume: bool) -> Result<(), String> {
-    let pid = parent_pid();
+pub fn init(out: &Output, force: bool, resume: bool) -> Result<(), String> {
+    let pid = session::parent_pid();
     let exists = storage::session_exists(pid)?;
 
     // 01-R9: --resume continues existing session
@@ -68,18 +68,3 @@ fn print_session_info(out: &Output, session: &Session) {
     out.key_value("PID", &session.pid.to_string());
 }
 
-/// Get the parent shell's PID. The envision binary is invoked as a child
-/// process, so its parent is the shell we want to track.
-fn parent_pid() -> u32 {
-    #[cfg(unix)]
-    {
-        unsafe extern "C" {
-            safe fn getppid() -> u32;
-        }
-        getppid()
-    }
-    #[cfg(not(unix))]
-    {
-        std::process::id()
-    }
-}

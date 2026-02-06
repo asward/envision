@@ -51,19 +51,19 @@ cargo install --path .
 
 ### Shell Integration
 
-For `envision` to modify your current shell's environment, add this function to your shell RC file (`~/.bashrc`, `~/.zshrc`, etc.):
+Add this line to your shell RC file (`~/.bashrc`, `~/.zshrc`, etc.):
 
 ```bash
-envision() {
-    if [ "$1" = "set" ] || [ "$1" = "unset" ] || [ "$1" = "clear" ]; then
-        eval "$(command envision "$@")"
-    else
-        command envision "$@"
-    fi
-}
+eval "$(envision hook bash)"
 ```
 
-This allows `envision` to output shell commands that modify your environment when needed.
+For fish shell, add to `~/.config/fish/config.fish`:
+
+```fish
+envision hook fish | source
+```
+
+This sets up a shell wrapper so that commands like `set`, `unset`, and `clear` can modify your current shell's environment.
 
 ## Usage
 
@@ -127,6 +127,7 @@ envision clear --force
 
 | Command                      | Description                                  |
 | ---------------------------- | -------------------------------------------- |
+| `envision hook <shell>`      | Print shell integration code                 |
 | `envision session init`      | Create baseline snapshot for current session |
 | `envision status`            | Show current state and change summary        |
 | `envision set <VAR> <value>` | Set and track an environment variable        |
