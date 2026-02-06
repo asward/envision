@@ -24,7 +24,7 @@ fn main() {
         Command::Profile { path, yes, dry_run } => commands::profile::run(&out, &mut ex, &path, yes, dry_run),
         Command::Set { var, value } => commands::set::run(&out, &mut ex, &var, &value),
         Command::Unset { var } => commands::unset::run(&out, &mut ex, &var),
-        Command::Clear { .. } => Err("'clear' is not yet implemented".into()),
+        Command::Clear { force } => commands::clear::run(&out, &mut ex, force),
         // Non-mutating commands
         Command::Hook { shell } => { mutating = false; commands::hook::run(&shell) },
         Command::Status => { mutating = false; commands::status::run(&out) },
